@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment (contains API keys — DO NOT COMMIT)
+.env
+
+# Database and data files
+data/app.db
+data/vector_db/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Build output
+frontend/dist/
+
+# Fay server (external dependency)
+fay-server/
+
+# Temp
+cache_data/
+memory/
+.claude/
+test_output.mp3
+frontend/data/
