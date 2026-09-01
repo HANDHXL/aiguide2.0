@@ -17,6 +17,7 @@ export interface ChatResponse {
   answer: string
   sources: SourceDoc[]
   conversation_id?: number
+  route?: RecommendResponse
 }
 
 export interface ConvSummary {
@@ -35,6 +36,7 @@ export interface ConvDetail {
     role: string
     content: string
     sources?: SourceDoc[]
+    route?: RecommendResponse | null
     created_at: string
   }[]
   created_at: string
@@ -45,6 +47,8 @@ export interface RouteStep {
   attraction_name: string
   duration_minutes: number
   description: string
+  lat?: number | null
+  lng?: number | null
 }
 
 export interface RecommendResponse {
@@ -52,6 +56,20 @@ export interface RecommendResponse {
   route_name: string
   steps: RouteStep[]
   total_duration: string
+  tips?: string[]
+}
+
+export interface MapAttraction {
+  id: string
+  name: string
+  lat: number
+  lng: number
+  category: string
+  description: string
+}
+
+export interface NearbyResult extends MapAttraction {
+  distance_m: number
 }
 
 export interface SearchResult {
@@ -80,6 +98,7 @@ export interface AdminStats {
   total_users: number
   satisfaction: { satisfied: number; neutral: number; unsatisfied: number }
   trend: { date: string; count: number }[]
+  sentiment_trend: { date: string; satisfied: number; neutral: number; unsatisfied: number }[]
   hot_questions: { question: string; count: number }[]
   kb_ready: boolean
   kb_chunks: number
@@ -93,12 +112,21 @@ export interface KbDocument {
   updated_at: number
 }
 
+export interface FeedbackItem {
+  id: number
+  username: string
+  content: string
+  rating: number
+  created_at: string
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   sources?: SourceDoc[]
   timestamp: number
+  route?: RecommendResponse
 }
 
 export interface DigitalHumanSettings {

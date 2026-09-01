@@ -16,6 +16,7 @@ class MessageItem(BaseModel):
     role: str
     content: str
     sources: Optional[List[dict]] = None
+    route: Optional[dict] = Field(None, description="该消息附带的路线推荐（仅路线消息）")
     created_at: datetime
 
 

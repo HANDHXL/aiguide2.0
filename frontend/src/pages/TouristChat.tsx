@@ -2,30 +2,21 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import Live2DDigitalHuman from '../components/Live2DDigitalHuman'
 import ChatPanel from '../components/ChatPanel'
 import ChatInput from '../components/ChatInput'
-import RecommendBar from '../components/RecommendBar'
 import ConversationSidebar from '../components/ConversationSidebar'
-import { useRecommend } from '../hooks/useRecommend'
-import { useWebSocket } from '../hooks/useWebSocket'
+import FeedbackWall from '../components/FeedbackWall'
+import RouteView from '../components/RouteView'
+import { useChatEngine } from '../hooks/useChatEngine'
 import { api } from '../api'
-import type { Message, ConvSummary } from '../types'
-import { loadSettings, getTtsVoice, getPersonaPrompt } from '../utils/settings'
-
-let msgId = Date.now()
-function nextId() { return `msg-${++msgId}` }
+import type { ConvSummary } from '../types'
+import { loadSettings, getTtsVoice } from '../utils/settings'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function TouristChat() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [loading, setLoading] = useState(false)
-  const [conversationId, setConversationId] = useState<number | null>(null)
   const [conversations, setConversations] = useState<ConvSummary[]>([])
-  const { route, loading: routeLoading, getRecommendation } = useRecommend()
-  const [voiceLoading, setVoiceLoading] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [showRoute, setShowRoute] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const streamingMsgRef = useRef<string | null>(null)
-  const streamingTextRef = useRef('')
   const speakingStartedRef = useRef(false)
-
-  const { connected, connect, send, onMessage } = useWebSocket()
 
   // Helper: trigger Live2D speaking
   const triggerLive2DSpeak = () => {
@@ -43,173 +34,76 @@ export default function TouristChat() {
     }
   }
 
-  // Connect WebSocket on mount
-  useEffect(() => { connect() }, [connect])
+  // 回答播报：数字人 TTS + 口型联动
+  const speak = useCallback((text: string) => {
+    const model = (window as any).__live2dModel
+    if (model) model.setSpeakingContext(text)
+    const s = loadSettings()
+    api.tts(text, getTtsVoice(s.voice), s.speed).then(blob => {
+      const url = URL.createObjectURL(blob)
+      const model = (window as any).__live2dModel
+      if (model) {
+        model.playTtsAudio(url, () => {
+          speakingStartedRef.current = false
+          URL.revokeObjectURL(url)
+        })
+      } else { triggerLive2DEnd() }
+    }).catch(() => { setTimeout(() => triggerLive2DEnd(), 2000) })
+  }, [])
+
+  // 语音对话返回的音频播报
+  const playVoiceAudio = useCallback((url: string) => {
+    if (audioRef.current) { audioRef.current.src = url; audioRef.current.play().catch(() => {}) }
+  }, [])
 
   // Load conversations list
   const loadConversations = useCallback(async () => {
-    try { setConversations(await api.conversations.list()) }
-    catch { /* ignore */ }
+    try { setConversations(await api.conversations.list()); return true }
+    catch { return false }
   }, [])
 
-  useEffect(() => { loadConversations() }, [loadConversations])
+  const { token } = useAuth()
 
-  // Load messages when switching conversation
+  // 聊天核心逻辑：与地图页小窗共用（useChatEngine），数字人表现由回调注入
+  const {
+    messages, isBusy,
+    conversationId, setConversationId, loadConversation,
+    handleSend, handleVoice,
+  } = useChatEngine({
+    onStartSpeaking: triggerLive2DSpeak,
+    onStopSpeaking: triggerLive2DEnd,
+    speak,
+    onConversationCreated: () => { loadConversations() },
+    playVoiceAudio,
+  })
+
+  // 首次加载失败时（token 尚未就位等）自动重试，保证登录后历史列表必现
   useEffect(() => {
-    if (conversationId === null) { setMessages([]); return }
-    (async () => {
-      try {
-        const conv = await api.conversations.get(conversationId)
-        setMessages(conv.messages.map(m => ({
-          id: `m-${m.id}`, role: m.role as 'user' | 'assistant',
-          content: m.content, sources: m.sources || undefined,
-          timestamp: new Date(m.created_at).getTime(),
-        })))
-      } catch { setMessages([]) }
+    let cancelled = false
+    ;(async () => {
+      const ok = await loadConversations()
+      if (!ok && !cancelled) {
+        setTimeout(() => { if (!cancelled) loadConversations() }, 1000)
+      }
     })()
-  }, [conversationId])
+    return () => { cancelled = true }
+  }, [loadConversations])
 
-  // Listen for streaming tokens
+  // 登录态变化（登录/切换账号）时重新拉取
   useEffect(() => {
-    return onMessage('stream', (data: any) => {
-      if (data.type === 'status') {
-        setLoading(true)
-        triggerLive2DSpeak()
-      } else if (data.type === 'conversation_id') {
-        // New conversation created by backend
-        if (data.conversation_id && !conversationId) {
-          setConversationId(data.conversation_id)
-          loadConversations()
-        }
-      } else if (data.type === 'token') {
-        const streamId = streamingMsgRef.current
-        if (streamId) {
-          streamingTextRef.current += data.content
-          setMessages(prev => prev.map(m =>
-            m.id === streamId ? { ...m, content: m.content + data.content } : m
-          ))
-        }
-      } else if (data.type === 'done') {
-        const streamId = streamingMsgRef.current
-        const finalText = streamingTextRef.current
-        if (streamId) {
-          setMessages(prev => prev.map(m =>
-            m.id === streamId ? { ...m, sources: data.sources } : m
-          ))
-        }
-        streamingMsgRef.current = null
-        streamingTextRef.current = ''
-        setLoading(false)
-        // Update conversation_id from response
-        if (data.conversation_id) {
-          setConversationId(data.conversation_id)
-          loadConversations()
-        }
-        if (finalText) {
-          const model = (window as any).__live2dModel
-          if (model) model.setSpeakingContext(finalText)
-          const s = loadSettings()
-          api.tts(finalText, getTtsVoice(s.voice), s.speed).then(blob => {
-            const url = URL.createObjectURL(blob)
-            const model = (window as any).__live2dModel
-            if (model) {
-              model.playTtsAudio(url, () => {
-                speakingStartedRef.current = false
-                URL.revokeObjectURL(url)
-              })
-            } else { triggerLive2DEnd() }
-          }).catch(() => { setTimeout(() => triggerLive2DEnd(), 2000) })
-        }
-      } else if (data.type === 'error') {
-        setMessages(prev => [...prev, {
-          id: nextId(), role: 'assistant',
-          content: `出错了：${data.message}`, timestamp: Date.now()
-        }])
-        streamingMsgRef.current = null; setLoading(false); triggerLive2DEnd()
-      }
-    })
-  }, [onMessage, conversationId, loadConversations])
-
-  const handleSend = useCallback((text: string) => {
-    const userMsg: Message = { id: nextId(), role: 'user', content: text, timestamp: Date.now() }
-    const aiMsgId = nextId()
-    const aiMsg: Message = { id: aiMsgId, role: 'assistant', content: '', timestamp: Date.now() }
-    setMessages(prev => [...prev, userMsg, aiMsg])
-    streamingMsgRef.current = aiMsgId
-    setLoading(true)
-
-    if (connected) {
-      triggerLive2DSpeak()
-      const s = loadSettings()
-      send({ question: text, conversation_id: conversationId, persona: getPersonaPrompt(s.style), name: s.name })
-    } else {
-      triggerLive2DSpeak()
-      const s = loadSettings()
-      api.chat({ question: text, conversation_id: conversationId, persona: getPersonaPrompt(s.style), name: s.name })
-        .then(data => {
-          setMessages(prev => prev.map(m =>
-            m.id === aiMsgId ? { ...m, content: data.answer, sources: data.sources } : m
-          ))
-          streamingMsgRef.current = null; setLoading(false)
-          if (data.conversation_id) { setConversationId(data.conversation_id); loadConversations() }
-          if (data.answer) {
-            const model = (window as any).__live2dModel
-            if (model) model.setSpeakingContext(data.answer)
-            const s2 = loadSettings()
-            api.tts(data.answer, getTtsVoice(s2.voice), s2.speed).then(blob => {
-              const url = URL.createObjectURL(blob)
-              const model = (window as any).__live2dModel
-              if (model) {
-                model.playTtsAudio(url, () => {
-                  speakingStartedRef.current = false
-                  URL.revokeObjectURL(url)
-                })
-              } else { triggerLive2DEnd() }
-            }).catch(() => { setTimeout(() => triggerLive2DEnd(), 2000) })
-          }
-        }).catch(err => {
-          setMessages(prev => prev.map(m =>
-            m.id === aiMsgId ? { ...m, content: `请求失败：${err.message}` } : m
-          ))
-          streamingMsgRef.current = null; setLoading(false); triggerLive2DEnd()
-        })
-    }
-  }, [connected, send, conversationId, loadConversations])
-
-  const handleVoice = useCallback(async (blob: Blob) => {
-    setVoiceLoading(true)
-    const userMsg: Message = { id: nextId(), role: 'user', content: '🎤 语音识别中...', timestamp: Date.now() }
-    setMessages(prev => [...prev, userMsg])
-    try {
-      const result = await api.voiceChat(blob)
-      setMessages(prev => [...prev,
-        { id: nextId(), role: 'user', content: `🎤 ${result.question}`, timestamp: Date.now() },
-        { id: nextId(), role: 'assistant', content: result.answer, sources: result.sources, timestamp: Date.now() }
-      ])
-      if (result.audio) {
-        const binary = atob(result.audio)
-        const bytes = new Uint8Array(binary.length)
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-        const url = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }))
-        if (audioRef.current) { audioRef.current.src = url; audioRef.current.play().catch(() => {}) }
-      }
-    } catch (err: any) {
-      setMessages(prev => [...prev, {
-        id: nextId(), role: 'assistant', content: `语音识别失败: ${err.message}`, timestamp: Date.now()
-      }])
-    } finally { setVoiceLoading(false) }
-  }, [])
+    if (token) loadConversations()
+  }, [token, loadConversations])
 
   // Conversation actions
-  const handleNewConv = useCallback(() => { setConversationId(null); setMessages([]) }, [])
-  const handleSelectConv = useCallback((conv: ConvSummary) => { setConversationId(conv.id) }, [])
+  const handleNewConv = useCallback(() => { setConversationId(null); setShowFeedback(false); setShowRoute(false) }, [setConversationId])
+  const handleFeedback = useCallback(() => { setShowFeedback(v => !v); if (!showFeedback) setShowRoute(false) }, [showFeedback])
+  const handleRoute = useCallback(() => { setShowRoute(v => !v); if (!showRoute) setShowFeedback(false) }, [showRoute])
+  const handleSelectConv = useCallback((conv: ConvSummary) => { loadConversation(conv.id) }, [loadConversation])
   const handleDeleteConv = useCallback(async (id: number) => {
     await api.conversations.delete(id)
-    if (conversationId === id) { setConversationId(null); setMessages([]) }
+    if (conversationId === id) setConversationId(null)
     loadConversations()
-  }, [conversationId, loadConversations])
-
-  const isBusy = loading || voiceLoading
+  }, [conversationId, setConversationId, loadConversations])
 
   // Quick question presets
   const quickQuestions = [
@@ -227,32 +121,43 @@ export default function TouristChat() {
       <ConversationSidebar
         conversations={conversations}
         activeId={conversationId}
-        onSelect={handleSelectConv}
+        showFeedback={showFeedback}
+        showRoute={showRoute}
+        onSelect={(c) => { handleSelectConv(c); setShowFeedback(false); setShowRoute(false) }}
         onNew={handleNewConv}
         onDelete={handleDeleteConv}
+        onFeedback={handleFeedback}
+        onRoute={handleRoute}
       />
       {/* Live2D */}
-      <div className="hidden md:flex w-[280px] flex-shrink-0 bg-gradient-to-b from-indigo-900 via-purple-800 to-slate-900 flex-col justify-center items-center border-r border-white/10">
+      <div className="hidden md:flex w-[280px] flex-shrink-0 bg-gray-900 flex-col justify-center items-center border-r border-white/10">
         <Live2DDigitalHuman />
       </div>
-      {/* Chat */}
+      {/* Chat / Route / Feedback */}
       <div className="flex-1 flex flex-col bg-white min-w-0">
-        <ChatPanel messages={messages} loading={isBusy} />
-        <RecommendBar onSelect={getRecommendation} route={route} loading={routeLoading} />
-        {/* Quick questions */}
-        <div className="flex gap-2 px-4 py-2 overflow-x-auto scrollbar-thin border-t border-gray-100">
-          {quickQuestions.map((q, i) => (
-            <button
-              key={i}
-              onClick={() => handleSend(q)}
-              disabled={isBusy}
-              className="flex-shrink-0 px-3 py-1.5 text-xs bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 disabled:opacity-40 transition-colors"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-        <ChatInput onSend={handleSend} onVoice={handleVoice} disabled={isBusy} />
+        {showRoute ? (
+          <RouteView />
+        ) : showFeedback ? (
+          <FeedbackWall />
+        ) : (
+          <>
+            <ChatPanel messages={messages} loading={isBusy} />
+            {/* Quick questions */}
+            <div className="flex gap-2 px-4 py-2 overflow-x-auto scrollbar-thin border-t border-gray-100">
+              {quickQuestions.map((q, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleSend(q)}
+                  disabled={isBusy}
+                  className="flex-shrink-0 px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 disabled:opacity-40 transition-colors"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+            <ChatInput onSend={handleSend} onVoice={handleVoice} disabled={isBusy} />
+          </>
+        )}
       </div>
       <audio ref={audioRef} className="hidden" />
     </div>

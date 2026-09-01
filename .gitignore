@@ -28,6 +28,9 @@ logs/
 
 # Build output
 frontend/dist/
+build/
+dist/
+*.tsbuildinfo
 
 # Fay server (external dependency)
 fay-server/

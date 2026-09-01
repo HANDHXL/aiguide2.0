@@ -1,20 +1,26 @@
+import { useNavigate } from 'react-router-dom'
 import type { ConvSummary } from '../types'
 
 interface Props {
   conversations: ConvSummary[]
   activeId: number | null
+  showFeedback: boolean
+  showRoute: boolean
   onSelect: (conv: ConvSummary) => void
   onNew: () => void
   onDelete: (id: number) => void
+  onFeedback: () => void
+  onRoute: () => void
 }
 
-export default function ConversationSidebar({ conversations, activeId, onSelect, onNew, onDelete }: Props) {
+export default function ConversationSidebar({ conversations, activeId, showFeedback, showRoute, onSelect, onNew, onDelete, onFeedback, onRoute }: Props) {
+  const navigate = useNavigate()
   return (
     <aside className="w-56 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col">
       <div className="p-3 border-b border-gray-100">
         <button
           onClick={onNew}
-          className="w-full px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
+          className="w-full px-4 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-black transition-colors"
         >
           + 新对话
         </button>
@@ -48,6 +54,35 @@ export default function ConversationSidebar({ conversations, activeId, onSelect,
             </button>
           </div>
         ))}
+      </div>
+      {/* 功能入口 */}
+      <div className="border-t border-gray-100 p-3 space-y-2">
+        <button
+          onClick={onRoute}
+          className={`w-full px-4 py-2 text-sm rounded-lg transition-colors ${
+            showRoute
+              ? 'bg-gray-900 text-white'
+              : 'text-gray-600 hover:bg-gray-100 border border-gray-200'
+          }`}
+        >
+          🗺 路线推荐
+        </button>
+        <button
+          onClick={() => navigate('/map')}
+          className="w-full px-4 py-2 text-sm rounded-lg transition-colors text-gray-600 hover:bg-gray-100 border border-gray-200"
+        >
+          📍 景区地图
+        </button>
+        <button
+          onClick={onFeedback}
+          className={`w-full px-4 py-2 text-sm rounded-lg transition-colors ${
+            showFeedback
+              ? 'bg-gray-900 text-white'
+              : 'text-gray-600 hover:bg-gray-100 border border-gray-200'
+          }`}
+        >
+          💬 留言墙
+        </button>
       </div>
     </aside>
   )

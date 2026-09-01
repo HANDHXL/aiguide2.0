@@ -34,5 +34,17 @@ class Message(Base):
     role = Column(String(20), nullable=False)
     content = Column(Text, nullable=False)
     sources_json = Column(Text, nullable=True)
+    sentiment_score = Column(Integer, nullable=True)  # 1-5 情感评分，仅 user 消息有值
+    route_json = Column(Text, nullable=True)  # 路线推荐 JSON，仅 assistant 路线消息有值
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     conversation = relationship("Conversation", back_populates="messages")
+
+
+class Feedback(Base):
+    __tablename__ = "feedback"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    username = Column(String(50), nullable=False, default="匿名游客")
+    content = Column(Text, nullable=False)
+    rating = Column(Integer, nullable=False, default=5)  # 1-5 星评分
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)

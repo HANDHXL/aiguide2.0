@@ -11,7 +11,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     try:
         payload = decode_token(token)
         user_id = int(payload["sub"])
-    except Exception:
+    except (ValueError, KeyError, TypeError) as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的认证令牌")
     user = get_user_by_id(user_id)
     if not user:

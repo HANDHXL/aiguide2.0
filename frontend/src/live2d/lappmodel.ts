@@ -51,7 +51,7 @@ import {
   resolveActionMotionNo
 } from './live2d-action-adapter';
 import { LipSync } from './lipsync';
-import { analyzeResponseForMotions, pickWeightedMotion } from '../utils/motion-hints';
+import { analyzeResponseForMotions, pickWeightedMotion, analyzeResponseForExpression } from '../utils/motion-hints';
 
 enum LoadStep {
   LoadAssets,
@@ -706,47 +706,6 @@ export class LAppModel extends CubismUserModel {
     this._model.addParameterValueById(this._idParamEyeBallX, this._dragX); // -1から1の値を加える
     this._model.addParameterValueById(this._idParamEyeBallY, this._dragY);
 
-    // リップシンク（仅在有音频播放时更新）
-    if (this._lipSync && this._fayAudioPlaying) {
-      this._lipSync.update();
-    }
-
-    // 前端口型模拟（由 TouristChat 触发，不依赖 Fay TTS 音频）
-    if (this._frontendSpeaking && !this._fayAudioPlaying) {
-      let openness: number;
-      if (this._ttsAnalyser && this._ttsDataArray) {
-        // ===== TTS 音频驱动：真实音量 → 口型 =====
-        const dataArray = this._ttsDataArray as unknown as Uint8Array<ArrayBuffer>;
-        this._ttsAnalyser.getByteTimeDomainData(dataArray);
-        // 计算 RMS 音量 (0~1)
-        let sumSq = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          const v = (dataArray[i] - 128) / 128;
-          sumSq += v * v;
-        }
-        const rms = Math.sqrt(sumSq / this._ttsDataArray.length);
-        // 音量映射到口型开合度，带平滑
-        const targetOpen = Math.min(0.85, rms * 2.5);
-        const currentOpen = this._model.getParameterValueById(this._idParamMouthOpenY);
-        openness = currentOpen + (targetOpen - currentOpen) * Math.min(1, deltaTimeSeconds * 12);
-      } else {
-        // ===== 无音频时：语音节奏模拟 =====
-        this._mouthPhase += deltaTimeSeconds;
-        if (this._mouthPhase >= this._mouthSyllableDuration) {
-          this._mouthPhase -= this._mouthSyllableDuration;
-          this._mouthSyllableDuration = 0.10 + Math.random() * 0.22;
-          this._mouthTarget = 0.15 + Math.random() * 0.55;
-          if (Math.random() < 0.08) {
-            this._mouthTarget = 0; // 偶尔停顿
-            this._mouthSyllableDuration = 0.08 + Math.random() * 0.12;
-          }
-        }
-        const currentOpen = this._model.getParameterValueById(this._idParamMouthOpenY);
-        openness = currentOpen + (this._mouthTarget - currentOpen) * Math.min(1, deltaTimeSeconds * 10);
-      }
-      this._model.setParameterValueById(this._idParamMouthOpenY, openness);
-    }
-
     // 记录本帧动作状态，供下一帧检测动作结束边界
     this._previousMotionPlaying = isMotionPlaying;
 
@@ -757,6 +716,71 @@ export class LAppModel extends CubismUserModel {
     // 物理演算更新
     if (this._physics) {
       this._physics.evaluate(this._model, deltaTimeSeconds);
+    }
+
+    // ============================================================
+    // 口型同步 — 必须放在 Pose/Physics 之后、_model.update() 之前
+    // 使用独立追踪值 _mouthTrackedOpen，不依赖被动作重置后的模型参数
+    // ============================================================
+
+    // Fay 音频嘴型同步
+    if (this._lipSync && this._fayAudioPlaying) {
+      this._lipSync.update();
+    }
+
+    // 前端口型模拟（由 TouristChat 触发，不依赖 Fay TTS 音频）
+    if (this._frontendSpeaking && !this._fayAudioPlaying) {
+      const smoothFactor = Math.min(1, deltaTimeSeconds * 15);
+
+      let targetOpen: number;
+      if (this._ttsAnalyser && this._ttsDataArray) {
+        // ===== TTS 音频驱动：真实音量 → 口型 =====
+        const dataArray = this._ttsDataArray as unknown as Uint8Array<ArrayBuffer>;
+        this._ttsAnalyser.getByteTimeDomainData(dataArray);
+        let sumSq = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const v = (dataArray[i] - 128) / 128;
+          sumSq += v * v;
+        }
+        const rms = Math.sqrt(sumSq / this._ttsDataArray.length);
+        targetOpen = Math.min(0.9, rms * 3.5);
+      } else {
+        // ===== 无音频时：语音节奏模拟 =====
+        this._mouthPhase += deltaTimeSeconds;
+        if (this._mouthPhase >= this._mouthSyllableDuration) {
+          this._mouthPhase -= this._mouthSyllableDuration;
+          this._mouthSyllableDuration = 0.08 + Math.random() * 0.18;
+          this._mouthTarget = 0.25 + Math.random() * 0.55;
+          if (Math.random() < 0.06) {
+            this._mouthTarget = 0;
+            this._mouthSyllableDuration = 0.15 + Math.random() * 0.15;
+          }
+        }
+        targetOpen = this._mouthTarget;
+      }
+
+      // ⚠️ 关键修复：使用独立追踪值而非从模型读取（动作每帧重置为0，会导致平滑卡死）
+      this._mouthTrackedOpen += (targetOpen - this._mouthTrackedOpen) * smoothFactor;
+
+      // 强制嘴部可见 + 嘴型开合
+      if (this._idParamMouthPart) {
+        this._model.setParameterValueById(this._idParamMouthPart, 1.0);
+      }
+      this._model.setParameterValueById(this._idParamMouthOpenY, this._mouthTrackedOpen);
+      // 重置嘴型到中性，防止动作残留歪嘴/抿嘴
+      if (this._idParamMouthForm) {
+        this._model.setParameterValueById(this._idParamMouthForm, 0);
+      }
+    }
+
+    // 不说话时确保嘴巴闭合
+    if (!this._frontendSpeaking && !this._fayAudioPlaying) {
+      // 追踪值渐进闭合
+      this._mouthTrackedOpen *= Math.max(0, 1 - deltaTimeSeconds * 18);
+      if (this._mouthTrackedOpen < 0.003) {
+        this._mouthTrackedOpen = 0;
+      }
+      this._model.setParameterValueById(this._idParamMouthOpenY, this._mouthTrackedOpen);
     }
 
     this._model.update();
@@ -1199,6 +1223,8 @@ export class LAppModel extends CubismUserModel {
 
     // Fay口型同步 / 前端口型模拟
     this._idParamMouthOpenY = CubismFramework.getIdManager().getId('ParamMouthOpenY');
+    this._idParamMouthForm = CubismFramework.getIdManager().getId('ParamMouthForm');
+    this._idParamMouthPart = CubismFramework.getIdManager().getId('Part01Mouth001');
 
     if (LAppDefine.MOCConsistencyValidationEnable) {
       this._mocConsistency = true;
@@ -1238,6 +1264,9 @@ export class LAppModel extends CubismUserModel {
     this._ttsAudioSource = null;
     this._ttsDataArray = null;
 
+    // 口型独立追踪（不依赖被动作重置后的模型参数值）
+    this._mouthTrackedOpen = 0;
+
     // 待机动作系统：初始 3-6 秒后播放第一个待机动作
     this._idleTimerSeconds = 3 + Math.random() * 3;
     this._nextIdleInterval = 0;
@@ -1246,6 +1275,7 @@ export class LAppModel extends CubismUserModel {
     this._lastSpeakingMotionNo = 0;
     this._motionSpeedScale = 1.0;
     this._speakingMotionScores = null;
+    this._speakingExpression = null;
 
     // 平滑回归默认姿态：动作结束时 lerp 过渡，避免僵硬跳变
     this._returnToDefaultActive = false;
@@ -1279,6 +1309,9 @@ export class LAppModel extends CubismUserModel {
   _ttsAudioSource: MediaElementAudioSourceNode | null;
   _ttsDataArray: Uint8Array | null;
 
+  // 口型独立追踪（不被动作重置影响）
+  _mouthTrackedOpen: number;
+
   // 待机动作系统
   _idleTimerSeconds: number;
   _nextIdleInterval: number;
@@ -1287,6 +1320,7 @@ export class LAppModel extends CubismUserModel {
   _lastSpeakingMotionNo: number; // 上次播放的说话动作编号（去重用）
   _motionSpeedScale: number;     // 动作播放速度缩放（0.85~1.2）
   _speakingMotionScores: Map<number, number> | null; // 回答内容的加权动作分数
+  _speakingExpression: string | null;      // 回答内容匹配的表情 ID (F01-F08)
 
   // 平滑回归默认姿态（动作结束 → 默认姿态 lerp）
   _returnToDefaultActive: boolean;
@@ -1316,6 +1350,8 @@ export class LAppModel extends CubismUserModel {
   _idParamBodyAngleX: CubismIdHandle; // パラメータID: ParamBodyAngleX
   _idParamBreath: CubismIdHandle; // パラメータID: ParamBreath
   _idParamMouthOpenY: CubismIdHandle; // パラメータID: ParamMouthOpenY (Fay口型同步)
+  _idParamMouthForm: CubismIdHandle;  // パラメータID: ParamMouthForm (嘴型)
+  _idParamMouthPart: CubismIdHandle;  // パラメータID: Part01Mouth001 (嘴部可见性)
 
   _idParamArmLA: CubismIdHandle; // パラメータID: ParamArmLA (左臂A-自然下垂)
   _idParamArmRA: CubismIdHandle; // パラメータID: ParamArmRA (右臂A-自然下垂)
@@ -1932,11 +1968,15 @@ export class LAppModel extends CubismUserModel {
     console.log('[LAppModel] triggerSpeakingStart');
     this._frontendSpeaking = true;
     this._mouthPhase = 0;
+    this._mouthTrackedOpen = 0; // 重置口型追踪
     // 不调用 stopAllMotions，SDK 自动交叉淡入淡出
     const motions = [1, 3, 4, 22, 23]; // 点头/微笑/开心/讲解
     const motionNo = motions[Math.floor(Math.random() * motions.length)];
     this.startConfiguredMotion(LAppDefine.MotionGroupTapBody, motionNo, 'speaking-start');
-    this.setExpression('F01');
+    // 使用语义分析匹配的表情，未匹配时默认温和微笑
+    const expression = this._speakingExpression || 'F01';
+    this.setExpression(expression);
+    console.log(`[LAppModel] 表情应用: ${expression}`);
   }
 
   /**
@@ -1946,7 +1986,12 @@ export class LAppModel extends CubismUserModel {
   public setSpeakingContext(text: string): void {
     if (!text || text.length < 3) return;
     this._speakingMotionScores = analyzeResponseForMotions(text);
-    console.log('[LAppModel] 回答语义分析完成，动作权重已更新');
+    this._speakingExpression = analyzeResponseForExpression(text);
+    // 立即应用表情，确保 TTS 播放前表情已切换
+    if (this._speakingExpression) {
+      this.setExpression(this._speakingExpression);
+    }
+    console.log(`[LAppModel] 回答语义分析: 表情=${this._speakingExpression}, 动作权重已更新`);
   }
 
   /**
@@ -1965,8 +2010,10 @@ export class LAppModel extends CubismUserModel {
    * 供 TouristChat 在流式输出时模拟口型变化
    */
   public setMouthOpen(value: number): void {
+    const clamped = Math.min(1, Math.max(0, value));
+    this._mouthTrackedOpen = clamped;
     if (this._idParamMouthOpenY) {
-      this._model.setParameterValueById(this._idParamMouthOpenY, Math.min(1, Math.max(0, value)));
+      this._model.setParameterValueById(this._idParamMouthOpenY, clamped);
     }
   }
 
@@ -1974,24 +2021,40 @@ export class LAppModel extends CubismUserModel {
    * 播放 TTS 音频并实时分析音量驱动口型
    * 每次创建全新 <audio> 避免 createMediaElementSource 单次绑定的限制
    */
-  public playTtsAudio(url: string, onEnded?: () => void): void {
+  public async playTtsAudio(url: string, onEnded?: () => void): Promise<void> {
     this.unbindTtsAudio();
     this._frontendSpeaking = true;
 
     try {
       const ctx = new AudioContext();
       this._ttsAudioContext = ctx;
-      if (ctx.state === 'suspended') ctx.resume();
+
+      // ⚠️ 关键修复：必须 await resume()，否则 Chrome 中 AudioContext 处于 suspended 状态，
+      // Analyser 不会产生数据 → 嘴巴不会动
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+        console.log('[LAppModel] AudioContext resumed, state:', ctx.state);
+      }
 
       const audio = new Audio(url);
       audio.preload = 'auto';
+      // 将 audio 挂到 DOM 确保某些浏览器中能正常播放
+      audio.style.display = 'none';
+      document.body.appendChild(audio);
 
-      const source = ctx.createMediaElementSource(audio);
+      let source: MediaElementAudioSourceNode;
+      try {
+        source = ctx.createMediaElementSource(audio);
+      } catch (mediaErr) {
+        // createMediaElementSource 每个 audio 元素只能调用一次
+        console.warn('[LAppModel] createMediaElementSource 失败，回退到节奏模拟:', mediaErr);
+        throw mediaErr;
+      }
       this._ttsAudioSource = source;
 
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.4;
+      analyser.smoothingTimeConstant = 0.3;
       this._ttsAnalyser = analyser;
       this._ttsDataArray = new Uint8Array(analyser.frequencyBinCount);
 
@@ -2003,6 +2066,8 @@ export class LAppModel extends CubismUserModel {
         this._frontendSpeaking = false;
         this.unbindTtsAudio();
         this.setExpression('F01');
+        // 清理 DOM
+        if (audio.parentNode) audio.parentNode.removeChild(audio);
         onEnded?.();
       };
 
@@ -2011,20 +2076,38 @@ export class LAppModel extends CubismUserModel {
         this._frontendSpeaking = false;
         this.unbindTtsAudio();
         this.setExpression('F01');
+        if (audio.parentNode) audio.parentNode.removeChild(audio);
         onEnded?.();
       };
 
-      audio.play().catch((e) => {
-        console.warn('[LAppModel] TTS 自动播放被拦截，重试:', e);
-        // 浏览器可能拦截自动播放，延迟重试
-        setTimeout(() => audio.play().catch(() => {}), 100);
-      });
-
-      console.log('[LAppModel] TTS 音频开始播放（音频分析已启用）');
+      try {
+        await audio.play();
+        console.log('[LAppModel] TTS 音频开始播放（音频分析已启用），volume:', audio.volume, 'duration:', audio.duration);
+      } catch (playErr) {
+        if (this.isAutoplayBlockedError(playErr)) {
+          console.warn('[LAppModel] TTS 自动播放被拦截，延迟重试:', playErr);
+          // 浏览器拦截自动播放，延迟重试
+          setTimeout(async () => {
+            try { await audio.play(); console.log('[LAppModel] TTS 延迟播放成功'); }
+            catch { /* 放弃 */ }
+          }, 150);
+        } else {
+          throw playErr;
+        }
+      }
     } catch (e) {
       console.warn('[LAppModel] TTS 音频分析启动失败，使用节奏模拟:', e);
       // 音频分析不可用时仍保持 _frontendSpeaking=true，fallback 到节奏模拟
       this.unbindTtsAudio();
+      // 节奏模拟用默认时长后自动结束说话，避免永远不闭嘴
+      setTimeout(() => {
+        if (this._frontendSpeaking && !this._ttsAnalyser) {
+          console.log('[LAppModel] 节奏模拟超时，自动结束说话');
+          this._frontendSpeaking = false;
+          this.setExpression('F01');
+          onEnded?.();
+        }
+      }, 10000); // 10秒后自动结束（足够节奏模拟覆盖大部分回答）
     }
   }
 

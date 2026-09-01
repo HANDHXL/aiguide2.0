@@ -4,11 +4,12 @@ import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from loguru import logger
 
-from backend.schemas.chat import ChatRequest, ChatResponse
-from backend.services.chat_service import chat_with_history, is_kb_ready
+from backend.schemas.chat import ChatRequest, ChatResponse, RouteInline, RouteStep
+from backend.services.chat_service import chat_with_history, is_kb_ready, _detect_route_intent
 from backend.services.rag_pipeline import get_pipeline
 from backend.services import conversation_service
 from backend.services.auth_service import decode_token, get_user_by_id
+from backend.services.sentiment_service import analyze_sentiment_async
 from backend.api.dependencies import get_current_user
 from backend.database.models import User
 
@@ -28,8 +29,9 @@ def _handle_chat(question: str, user: User, conversation_id: int | None, interes
         conv = conversation_service.create_conversation(user.id)
         conversation_id = conv.id
 
-    # 2. Save user message
-    conversation_service.add_message(conversation_id, "user", question)
+    # 2. Save user message (sentiment analyzed async to avoid blocking)
+    msg = conversation_service.add_message(conversation_id, "user", question)
+    analyze_sentiment_async(question, msg.id)  # fire-and-forget: score persisted in background
 
     # 3. Auto-title if first message
     msgs = conversation_service.get_conversation_messages(conversation_id)
@@ -44,26 +46,48 @@ def _handle_chat(question: str, user: User, conversation_id: int | None, interes
     # 5. Call LLM with history
     result = chat_with_history(question, history=history, interest=interest, persona=persona, name=name)
 
-    # 6. Save assistant message
+    # 6. Detect route intent — if user is asking for route planning, generate one
+    route_data = _detect_route_intent(question)
+
+    # 7. Save assistant message (persist route so it survives page refresh)
     conversation_service.add_message(
         conversation_id, "assistant", result["answer"],
-        sources=result.get("sources")
+        sources=result.get("sources"),
+        route_json=json.dumps(route_data, ensure_ascii=False) if route_data else None,
     )
 
-    return result, conversation_id
+    return result, conversation_id, route_data
 
 
 @router.post("", response_model=ChatResponse, summary="文本问答（多轮对话）")
 async def text_chat(req: ChatRequest, user: User = Depends(get_current_user)):
-    result, conv_id = _handle_chat(
+    result, conv_id, route_data = _handle_chat(
         req.question, user, req.conversation_id,
         interest=req.interest, persona=req.persona, name=req.name
     )
+    # Build route inline if detected
+    route_inline = None
+    if route_data:
+        route_inline = RouteInline(
+            route_name=route_data.get("route_name", "推荐路线"),
+            steps=[RouteStep(
+                order=s.get("order", i+1),
+                attraction_id=f"LS-{s.get('order', i+1):03d}",
+                attraction_name=s.get("attraction_name", ""),
+                duration_minutes=s.get("duration_minutes", 30),
+                description=s.get("description", ""),
+                lat=s.get("lat"),
+                lng=s.get("lng"),
+            ) for i, s in enumerate(route_data.get("steps", []))],
+            total_duration=route_data.get("total_duration", "约2小时"),
+            tips=route_data.get("tips", []),
+        )
     return ChatResponse(
         question=result["question"],
         answer=result["answer"],
         sources=result.get("sources", []),
-        conversation_id=conv_id
+        conversation_id=conv_id,
+        route=route_inline,
     )
 
 
@@ -81,7 +105,7 @@ async def ws_chat(ws: WebSocket):
         if not user:
             await ws.close(code=4001, reason="Invalid user")
             return
-    except Exception:
+    except (ValueError, KeyError, TypeError):
         await ws.close(code=4001, reason="Invalid token")
         return
 
@@ -113,7 +137,12 @@ async def ws_chat(ws: WebSocket):
                 conv = conversation_service.create_conversation(user.id)
                 conversation_id = conv.id
 
-            conversation_service.add_message(conversation_id, "user", question)
+            # --- Route detection (before LLM call, so we can stream it back)
+            route_data = _detect_route_intent(question)
+
+            # Save user message (sentiment analyzed async to avoid blocking)
+            msg = conversation_service.add_message(conversation_id, "user", question)
+            analyze_sentiment_async(question, msg.id)
 
             msgs = conversation_service.get_conversation_messages(conversation_id)
             if len(msgs) <= 1:
@@ -154,18 +183,20 @@ async def ws_chat(ws: WebSocket):
                         full_answer.append(chunk["token"])
                         await ws.send_json({"type": "token", "content": chunk["token"]})
                     elif chunk.get("done"):
-                        # Save assistant message
+                        # Save assistant message (persist route so it survives page refresh)
                         conversation_service.add_message(
                             conversation_id, "assistant", chunk["answer"],
-                            sources=chunk.get("sources")
+                            sources=chunk.get("sources"),
+                            route_json=json.dumps(route_data, ensure_ascii=False) if route_data else None,
                         )
                         await ws.send_json({
                             "type": "done",
                             "answer": chunk["answer"],
                             "sources": chunk.get("sources", []),
-                            "conversation_id": conversation_id
+                            "conversation_id": conversation_id,
+                            "route": route_data,  # None if not a route request
                         })
-            except Exception as e:
+            except (RuntimeError, ValueError, KeyError) as e:
                 logger.error(f"Stream error: {e}")
                 await ws.send_json({"type": "error", "message": str(e)})
 
@@ -173,7 +204,7 @@ async def ws_chat(ws: WebSocket):
         logger.info("WebSocket client disconnected")
     except json.JSONDecodeError:
         await ws.send_json({"type": "error", "message": "无效的JSON格式"})
-    except Exception as e:
+    except (RuntimeError, ConnectionError) as e:
         logger.error(f"WebSocket error: {e}")
         try:
             await ws.send_json({"type": "error", "message": str(e)})

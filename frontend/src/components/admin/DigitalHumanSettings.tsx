@@ -22,16 +22,18 @@ export default function DigitalHumanSettings() {
 
       {/* Preview */}
       <div className="stat-card flex items-center gap-6">
-        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-300 to-orange-400 flex items-center justify-center shadow-lg">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-800 to-purple-700 flex items-center justify-center">
-            <svg viewBox="0 0 100 100" className="w-14 h-14">
-              <circle cx="50" cy="45" r="30" fill="#fbbf24" opacity="0.3" />
-              <ellipse cx="40" cy="40" rx="5" ry="6" fill="#e2e8f0" />
-              <ellipse cx="60" cy="40" rx="5" ry="6" fill="#e2e8f0" />
-              <circle cx="50" cy="55" r="8" fill="none" stroke="#e2e8f0" strokeWidth="3" />
-              <circle cx="50" cy="40" r="35" fill="none" stroke="#fbbf24" strokeWidth="1.5" opacity="0.5" />
-            </svg>
-          </div>
+        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-300 to-orange-400 flex items-center justify-center shadow-lg overflow-hidden">
+          <img
+            src="/avatar.png"
+            alt="数字人形象预览"
+            className="w-full h-full object-cover rounded-full"
+            onError={(e) => {
+              // Fallback to placeholder on load error
+              const el = e.currentTarget
+              el.style.display = 'none'
+              el.parentElement!.classList.add('placeholder-fallback')
+            }}
+          />
         </div>
         <div>
           <p className="text-xl font-semibold text-gray-800">{settings.name}</p>

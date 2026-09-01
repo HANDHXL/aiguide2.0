@@ -66,15 +66,16 @@ export default function Live2DDigitalHuman() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6">
-        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-amber-300 via-amber-400 to-orange-400 flex items-center justify-center shadow-2xl">
-          <div className="w-28 h-28 rounded-full bg-gradient-to-br from-indigo-800 to-purple-700 flex items-center justify-center">
-            <svg viewBox="0 0 100 100" className="w-20 h-20">
-              <circle cx="50" cy="45" r="30" fill="#fbbf24" opacity="0.3" />
-              <ellipse cx="40" cy="40" rx="5" ry="6" fill="#e2e8f0" />
-              <ellipse cx="60" cy="40" rx="5" ry="6" fill="#e2e8f0" />
-              <circle cx="50" cy="55" r="8" fill="none" stroke="#e2e8f0" strokeWidth="3" />
-            </svg>
-          </div>
+        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-amber-300 via-amber-400 to-orange-400 flex items-center justify-center shadow-2xl overflow-hidden">
+          <img
+            src="/avatar.png"
+            alt="数字人预览"
+            className="w-full h-full object-cover rounded-full"
+            onError={(e) => {
+              const el = e.currentTarget
+              el.style.display = 'none'
+            }}
+          />
         </div>
         <p className="text-white/60 text-sm mt-4">3D渲染不可用</p>
       </div>
@@ -85,7 +86,7 @@ export default function Live2DDigitalHuman() {
     <div className="relative w-full h-full">
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="w-12 h-12 border-3 border-amber-400 border-t-transparent rounded-full animate-spin" />
+          <div className="w-12 h-12 border-3 border-white/40 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
       <canvas

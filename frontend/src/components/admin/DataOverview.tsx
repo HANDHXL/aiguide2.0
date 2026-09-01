@@ -13,7 +13,7 @@ function StatCard({ title, value, sub, color }: { title: string; value: string; 
   )
 }
 
-const COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899']
+const COLORS = ['#1f2937', '#374151', '#4b5563', '#6b7280', '#9ca3af']
 
 export default function DataOverview() {
   const [stats, setStats] = useState<AdminStats | null>(null)
@@ -56,10 +56,10 @@ export default function DataOverview() {
       <h2 className="text-lg font-semibold text-gray-800">数据概览</h2>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="今日服务人次" value={String(stats.today_visits)} sub={`总消息 ${stats.total_messages.toLocaleString()} 条`} color="text-blue-600" />
-        <StatCard title="本周服务人次" value={String(stats.week_visits)} sub={`${stats.total_conversations} 次对话`} color="text-green-600" />
-        <StatCard title="用户满意度" value={`${stats.satisfaction.satisfied}%`} sub={`中性 ${stats.satisfaction.neutral}% · 不满意 ${stats.satisfaction.unsatisfied}%`} color="text-amber-600" />
-        <StatCard title="热门问答TOP1" value={hotLabel} sub={`被提问 ${hotCount} 次`} color="text-purple-600" />
+        <StatCard title="今日服务人次" value={String(stats.today_visits)} sub={`总消息 ${stats.total_messages.toLocaleString()} 条`} color="text-gray-900" />
+        <StatCard title="本周服务人次" value={String(stats.week_visits)} sub={`${stats.total_conversations} 次对话`} color="text-gray-900" />
+        <StatCard title="用户满意度" value={`${stats.satisfaction.satisfied}%`} sub={`中性 ${stats.satisfaction.neutral}% · 不满意 ${stats.satisfaction.unsatisfied}%`} color="text-gray-900" />
+        <StatCard title="热门问答TOP1" value={hotLabel} sub={`被提问 ${hotCount} 次`} color="text-gray-900" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -71,7 +71,7 @@ export default function DataOverview() {
               <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#94a3b8" />
               <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="服务量" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="服务量" fill="#374151" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -107,7 +107,7 @@ export default function DataOverview() {
           <h3 className="text-sm font-medium text-gray-700">知识库状态</h3>
           <p className="text-xs text-gray-400 mt-1">向量数据库 · {stats.kb_chunks} 个文档块 · {stats.total_users} 个注册用户</p>
         </div>
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${stats.kb_ready ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+        <span className={`px-3 py-1 rounded-full text-xs font-medium ${stats.kb_ready ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500'}`}>
           {stats.kb_ready ? '运行中' : '未连接'}
         </span>
       </div>

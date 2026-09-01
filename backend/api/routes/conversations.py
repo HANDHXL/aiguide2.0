@@ -32,6 +32,7 @@ def get_conversation(conv_id: int, user: User = Depends(get_current_user)):
         MessageItem(
             id=m.id, role=m.role, content=m.content,
             sources=json.loads(m.sources_json) if m.sources_json else None,
+            route=json.loads(m.route_json) if m.route_json else None,
             created_at=m.created_at
         ) for m in messages
     ]

@@ -1,0 +1,11 @@
+venv/
+frontend/node_modules/
+frontend/dist/
+fay-server/
+.git/
+__pycache__/
+*.pyc
+.env.local
+logs/
+*.json
+!package.json

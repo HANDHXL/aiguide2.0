@@ -83,7 +83,7 @@ def get_conversation_messages(conv_id: int) -> List[Message]:
         db.close()
 
 
-def add_message(conv_id: int, role: str, content: str, sources: Optional[List[dict]] = None) -> Message:
+def add_message(conv_id: int, role: str, content: str, sources: Optional[List[dict]] = None, sentiment_score: Optional[int] = None, route_json: Optional[str] = None) -> Message:
     db = SessionLocal()
     try:
         sources_json = json.dumps(sources, ensure_ascii=False) if sources else None
@@ -91,16 +91,35 @@ def add_message(conv_id: int, role: str, content: str, sources: Optional[List[di
             conversation_id=conv_id,
             role=role,
             content=content,
-            sources_json=sources_json
+            sources_json=sources_json,
+            sentiment_score=sentiment_score,
+            route_json=route_json,
         )
         db.add(msg)
-        db.commit()
-        db.refresh(msg)
+        db.flush()  # populate msg.id and created_at
+        # Capture values before commit (which expires objects)
+        msg_id = msg.id
+        created_at = msg.created_at
         db.query(Conversation).filter(Conversation.id == conv_id).update(
-            {"updated_at": msg.created_at}
+            {"updated_at": created_at}
         )
         db.commit()
-        return msg
+        # Return a lightweight result to avoid DetachedInstanceError
+        from collections import namedtuple
+        MsgResult = namedtuple('MsgResult', ['id', 'conversation_id', 'role', 'content', 'created_at'])
+        return MsgResult(id=msg_id, conversation_id=conv_id, role=role, content=content, created_at=created_at)
+    finally:
+        db.close()
+
+
+def update_message_sentiment(message_id: int, sentiment_score: int):
+    """Update the sentiment score of an existing message (for async analysis)."""
+    db = SessionLocal()
+    try:
+        db.query(Message).filter(Message.id == message_id).update(
+            {"sentiment_score": sentiment_score}
+        )
+        db.commit()
     finally:
         db.close()
 

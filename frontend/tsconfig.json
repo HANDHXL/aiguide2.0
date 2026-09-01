@@ -18,9 +18,8 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": false,
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": "./",
     "paths": {
-      "@framework/*": ["src/live2d/framework/*"]
+      "@framework/*": ["./src/live2d/framework/*"]
     }
   },
   "include": ["src"]

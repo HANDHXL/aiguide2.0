@@ -36,12 +36,15 @@ async def recommend(req: RecommendRequest):
             attraction_id=s.get("attraction_id", f"LS-{s.get('order', 0):03d}"),
             attraction_name=s.get("attraction_name", ""),
             duration_minutes=s.get("duration_minutes", 30),
-            description=s.get("description", "")
+            description=s.get("description", ""),
+            lat=s.get("lat"),
+            lng=s.get("lng"),
         ))
 
     return RecommendResponse(
         interest=result["interest"],
         route_name=result.get("route_name", "推荐路线"),
         steps=steps,
-        total_duration=result.get("total_duration", "约2小时")
+        total_duration=result.get("total_duration", "约2小时"),
+        tips=result.get("tips", []),
     )

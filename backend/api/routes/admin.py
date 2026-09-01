@@ -24,8 +24,8 @@ def kb_status(user: User = Depends(get_current_user)):
     try:
         if pipeline.vectorstore:
             chunks = pipeline.vectorstore._collection.count()
-    except Exception:
-        pass
+    except (AttributeError, RuntimeError):
+        pass  # collection not initialized yet
     return {"kb_ready": pipeline.vectorstore is not None, "chunks": int(chunks)}
 
 
@@ -47,7 +47,7 @@ async def kb_upload(file: UploadFile = File(...), user: User = Depends(get_curre
     try:
         build_knowledge_base(force=True)
         return {"ok": True, "filename": file.filename, "size": len(content)}
-    except Exception as e:
+    except (OSError, ValueError, RuntimeError) as e:
         raise HTTPException(status_code=500, detail=f"知识库重建失败: {str(e)}")
 
 
@@ -61,7 +61,7 @@ def kb_rebuild(user: User = Depends(get_current_user)):
         if pipeline.vectorstore:
             chunks = pipeline.vectorstore._collection.count()
         return {"ok": True, "chunks": int(chunks)}
-    except Exception as e:
+    except (OSError, ValueError, RuntimeError) as e:
         raise HTTPException(status_code=500, detail=f"重建失败: {str(e)}")
 
 
@@ -78,7 +78,7 @@ def kb_delete_document(filename: str, user: User = Depends(get_current_user)):
     try:
         build_knowledge_base(force=True)
         return {"ok": True, "filename": filename}
-    except Exception as e:
+    except (OSError, ValueError, RuntimeError) as e:
         raise HTTPException(status_code=500, detail=f"知识库重建失败: {str(e)}")
 
 

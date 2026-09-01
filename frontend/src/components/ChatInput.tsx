@@ -80,7 +80,7 @@ export default function ChatInput({
           onClick={toggleVoice}
           className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
             recording
-              ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-200'
+              ? 'bg-gray-800 text-white animate-pulse shadow-lg shadow-gray-300'
               : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
           }`}
           title={recording ? '点击停止录音' : '点击开始语音输入'}

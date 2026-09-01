@@ -97,15 +97,15 @@ export default function KnowledgeManager() {
       {/* Stats summary */}
       <div className="grid grid-cols-3 gap-4">
         <div className="stat-card text-center">
-          <p className="text-3xl font-bold text-indigo-600">{docs.length}</p>
+          <p className="text-3xl font-bold text-gray-900">{docs.length}</p>
           <p className="text-sm text-gray-500">知识文档</p>
         </div>
         <div className="stat-card text-center">
-          <p className="text-3xl font-bold text-green-600">{chunks}</p>
+          <p className="text-3xl font-bold text-gray-900">{chunks}</p>
           <p className="text-sm text-gray-500">文档分块</p>
         </div>
         <div className="stat-card text-center">
-          <p className="text-3xl font-bold text-amber-600">768维</p>
+          <p className="text-3xl font-bold text-gray-900">768维</p>
           <p className="text-sm text-gray-500">向量维度</p>
         </div>
       </div>
@@ -122,7 +122,7 @@ export default function KnowledgeManager() {
             {docs.map((doc, i) => (
               <div key={i} className="flex items-center justify-between py-3 px-3 rounded-lg hover:bg-gray-50 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold">
+                  <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-bold">
                     {typeLabel(doc.type)}
                   </div>
                   <div>
@@ -131,7 +131,7 @@ export default function KnowledgeManager() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">已索引</span>
+                  <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">已索引</span>
                   <button
                     onClick={() => handleDelete(doc.name)}
                     className="text-gray-400 hover:text-red-500 transition-colors"
@@ -155,7 +155,7 @@ export default function KnowledgeManager() {
         <button
           onClick={handleRebuild}
           disabled={rebuilding}
-          className="px-4 py-2 bg-amber-500 text-white text-sm rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50"
+          className="px-4 py-2 bg-gray-700 text-white text-sm rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
         >
           {rebuilding ? '重建中...' : '重新构建知识库'}
         </button>

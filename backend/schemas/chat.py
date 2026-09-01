@@ -18,11 +18,20 @@ class SourceDoc(BaseModel):
     type: str = Field("unknown", description="文档类型")
 
 
+class RouteInline(BaseModel):
+    """内嵌在聊天回复中的路线推荐"""
+    route_name: str
+    steps: List[RouteStep]
+    total_duration: str
+    tips: List[str] = Field(default_factory=list)
+
+
 class ChatResponse(BaseModel):
     question: str
     answer: str
     sources: List[SourceDoc] = Field(default_factory=list)
     conversation_id: Optional[int] = None
+    route: Optional[RouteInline] = Field(None, description="若问题涉及路线规划，附带生成的路线")
 
 
 class AttractionInfo(BaseModel):
@@ -45,6 +54,21 @@ class RouteStep(BaseModel):
     attraction_name: str
     duration_minutes: int
     description: str
+    lat: Optional[float] = Field(None, description="景点纬度")
+    lng: Optional[float] = Field(None, description="景点经度")
+
+
+class MapAttraction(BaseModel):
+    id: str
+    name: str
+    lat: float
+    lng: float
+    category: str = ""
+    description: str = ""
+
+
+class NearbyResult(MapAttraction):
+    distance_m: int = Field(..., description="与游客定位的距离（米）")
 
 
 class RecommendResponse(BaseModel):
@@ -52,6 +76,7 @@ class RecommendResponse(BaseModel):
     route_name: str
     steps: List[RouteStep]
     total_duration: str
+    tips: List[str] = Field(default_factory=list, description="游览注意事项")
 
 
 class HealthResponse(BaseModel):

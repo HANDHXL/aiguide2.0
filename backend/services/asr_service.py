@@ -126,9 +126,9 @@ async def speech_to_text(audio_data: bytes) -> str:
             except asyncio.CancelledError:
                 pass
 
-    except Exception as e:
+    except (ConnectionError, TimeoutError, ValueError, KeyError) as e:
         logger.error(f"ASR connection error: {e}")
-        raise RuntimeError(f"ASR failed: {e}")
+        raise RuntimeError(f"ASR failed: {e}") from e
 
     result = "".join(result_text)
     if not result:

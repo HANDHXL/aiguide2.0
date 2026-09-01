@@ -146,27 +146,27 @@ export default function MotionTest() {
   }, [getModel])
 
   return (
-    <div className="flex h-full" style={{ background: '#0f0f1a' }}>
+    <div className="flex h-full" style={{ background: '#111' }}>
       {/* ====== Left: Live2D Canvas ====== */}
       <div className="flex-1 relative" style={{ minWidth: 0 }}>
         <Live2DDigitalHuman />
         {/* Status bar */}
         <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3">
           <div className="flex-1 px-4 py-2 rounded-lg text-sm font-mono"
-               style={{ background: 'rgba(0,0,0,0.75)', color: '#a5f3fc', border: '1px solid rgba(165,243,252,0.2)' }}>
+               style={{ background: 'rgba(0,0,0,0.75)', color: '#d1d5db', border: '1px solid rgba(255,255,255,0.1)' }}>
             {status}
           </div>
           <button
             onClick={stopAll}
             className="px-4 py-2 rounded-lg text-sm font-bold text-white transition-all hover:scale-105"
-            style={{ background: '#ef4444' }}
+            style={{ background: '#374151' }}
           >
             ⏹ 停止
           </button>
           <button
             onClick={playRandom}
             className="px-4 py-2 rounded-lg text-sm font-bold text-white transition-all hover:scale-105"
-            style={{ background: '#8b5cf6' }}
+            style={{ background: '#4b5563' }}
             disabled={!modelReady}
           >
             🎲 随机
@@ -177,20 +177,20 @@ export default function MotionTest() {
       {/* ====== Right: Control Panel ====== */}
       <div className="flex flex-col overflow-y-auto" style={{
         width: 420,
-        background: '#1a1a2e',
+        background: '#1a1a1a',
         borderLeft: '1px solid rgba(255,255,255,0.08)',
       }}>
         {/* Header */}
-        <div className="sticky top-0 z-10 px-5 py-4" style={{ background: '#1a1a2e', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="sticky top-0 z-10 px-5 py-4" style={{ background: '#1a1a1a', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <h1 className="text-lg font-bold text-white">🎭 动作 & 表情测试面板</h1>
-          <p className="text-xs mt-1" style={{ color: '#94a3b8' }}>Haru Live2D · {TAPBODY_MOTIONS.length} 动作 + {EXPRESSIONS.length} 表情</p>
+          <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>Haru Live2D · {TAPBODY_MOTIONS.length} 动作 + {EXPRESSIONS.length} 表情</p>
         </div>
 
         <div className="px-4 py-3 space-y-5">
 
           {/* ---- Idle Group ---- */}
           <section>
-            <h2 className="text-sm font-bold mb-2 flex items-center gap-2" style={{ color: '#fbbf24' }}>
+            <h2 className="text-sm font-bold mb-2 flex items-center gap-2" style={{ color: '#d1d5db' }}>
               <span>🔄</span> Idle 空闲组（{IDLE_MOTIONS.length}个）
             </h2>
             <div className="flex gap-2 flex-wrap">
@@ -200,7 +200,7 @@ export default function MotionTest() {
                   onClick={() => playMotion('Idle', m.no, m.label)}
                   disabled={!modelReady}
                   className="px-3 py-2 rounded-lg text-xs font-bold transition-all hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{ background: '#334155', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}
+                  style={{ background: '#334155', color: '#d1d5db', border: '1px solid rgba(255,255,255,0.15)' }}
                 >
                   {m.label}
                   <span className="block text-[10px] opacity-70">{m.duration}</span>
@@ -210,7 +210,7 @@ export default function MotionTest() {
                 onClick={playIdle}
                 disabled={!modelReady}
                 className="px-3 py-2 rounded-lg text-xs font-bold transition-all hover:scale-105 disabled:opacity-40"
-                style={{ background: '#fbbf24', color: '#1a1a2e' }}
+                style={{ background: '#fbbf24', color: '#1a1a1a' }}
               >
                 ▶ 启动Idle循环
               </button>
@@ -219,7 +219,7 @@ export default function MotionTest() {
 
           {/* ---- TapBody Group ---- */}
           <section>
-            <h2 className="text-sm font-bold mb-2 flex items-center gap-2" style={{ color: '#60a5fa' }}>
+            <h2 className="text-sm font-bold mb-2 flex items-center gap-2" style={{ color: '#d1d5db' }}>
               <span>👆</span> TapBody 交互组（{TAPBODY_MOTIONS.length}个）
             </h2>
             <div className="grid grid-cols-2 gap-1.5">
@@ -232,15 +232,15 @@ export default function MotionTest() {
                   style={{
                     background: '#1e293b',
                     color: '#e2e8f0',
-                    border: '1px solid rgba(96,165,250,0.15)',
+                    border: '1px solid rgba(255,255,255,0.1)',
                   }}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono font-bold" style={{ color: '#60a5fa' }}>{m.label}</span>
+                    <span className="font-mono font-bold" style={{ color: '#d1d5db' }}>{m.label}</span>
                     <span className="text-[10px] opacity-50">{m.duration}</span>
                     {m.hasSound && <span title="带配音">🔊</span>}
                   </div>
-                  <div className="text-[11px] mt-0.5 leading-tight" style={{ color: '#94a3b8' }}>
+                  <div className="text-[11px] mt-0.5 leading-tight" style={{ color: '#9ca3af' }}>
                     {m.semantics}
                   </div>
                 </button>
@@ -250,7 +250,7 @@ export default function MotionTest() {
 
           {/* ---- Expressions ---- */}
           <section className="pb-4">
-            <h2 className="text-sm font-bold mb-2 flex items-center gap-2" style={{ color: '#f472b6' }}>
+            <h2 className="text-sm font-bold mb-2 flex items-center gap-2" style={{ color: '#d1d5db' }}>
               <span>😊</span> Expressions 表情（{EXPRESSIONS.length}个）
             </h2>
             <div className="grid grid-cols-2 gap-1.5">
@@ -263,10 +263,10 @@ export default function MotionTest() {
                   style={{
                     background: '#1e293b',
                     color: '#e2e8f0',
-                    border: '1px solid rgba(244,114,182,0.15)',
+                    border: '1px solid rgba(255,255,255,0.1)',
                   }}
                 >
-                  <span className="font-mono font-bold" style={{ color: '#f472b6' }}>{e.id}</span>
+                  <span className="font-mono font-bold" style={{ color: '#d1d5db' }}>{e.id}</span>
                   <span className="ml-2">{e.emotion}</span>
                   <div className="text-[10px] mt-0.5 opacity-50">{e.desc}</div>
                 </button>

@@ -1,7 +1,8 @@
 import type {
   ChatRequest, ChatResponse,
   RecommendResponse, SearchResponse, HealthResponse,
-  ConvSummary, ConvDetail, AdminStats, KbDocument
+  ConvSummary, ConvDetail, AdminStats, KbDocument, FeedbackItem,
+  MapAttraction, NearbyResult
 } from '../types'
 
 /** 清洗 markdown 语法，避免 TTS 念出 # * 等符号 */
@@ -26,8 +27,15 @@ function stripMarkdown(text: string): string {
 
 const BASE = '/api'
 let _authToken: string | null = null
+let _tokenInited = false
 
 function authHeaders(): Record<string, string> {
+  // 首次调用时同步从 localStorage 取 token：AuthProvider 的 effect 晚于子组件执行，
+  // 若不在此兜底，登录后首屏的请求会不带 token 被 401（表现为历史对话列表为空）
+  if (!_tokenInited) {
+    _tokenInited = true
+    try { _authToken = localStorage.getItem('auth_token') } catch { _authToken = null }
+  }
   const h: Record<string, string> = {}
   if (_authToken) h['Authorization'] = `Bearer ${_authToken}`
   return h
@@ -72,6 +80,11 @@ export const api = {
 
   searchAttractions: (q: string, k: number = 5) =>
     request<SearchResponse>(`/attractions?q=${encodeURIComponent(q)}&k=${k}`),
+
+  mapAttractions: () => request<MapAttraction[]>('/map/attractions'),
+
+  mapNearby: (lat: number, lng: number, radius: number = 1.5) =>
+    request<NearbyResult[]>(`/map/nearby?lat=${lat}&lng=${lng}&radius=${radius}`),
 
   voiceChat: async (audioBlob: Blob, interest?: string) => {
     const form = new FormData()
@@ -145,5 +158,11 @@ export const api = {
     kbRebuild: () => request<{ ok: boolean; chunks: number }>('/admin/kb/rebuild', { method: 'POST' }),
     kbDelete: (filename: string) => request<{ ok: boolean }>(`/admin/kb/document/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
     kbDocuments: () => request<{ documents: KbDocument[] }>('/admin/kb/documents'),
+  },
+
+  feedback: {
+    create: (data: { content: string; rating: number }) =>
+      request<FeedbackItem>('/feedback', { method: 'POST', body: JSON.stringify(data) }),
+    list: () => request<FeedbackItem[]>('/feedback'),
   },
 }

@@ -36,7 +36,7 @@ export default function LoginPage() {
           {isRegister ? '注册账号' : '登录'}
         </h2>
         {error && (
-          <div className="mb-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+          <div className="mb-4 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-700">
             {error}
           </div>
         )}
