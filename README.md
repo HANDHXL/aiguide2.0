@@ -2,6 +2,28 @@
 
 基于多模态大模型的智能景区导览系统。
 
+## 功能展示
+
+### 游客端 · 数字人对话
+
+![游客端聊天主页](screenshots/chat-home.png)
+
+### 游客端 · 景区地图（路线绘制 + 对话小窗）
+
+![景区地图](screenshots/map-page.png)
+
+### 管理后台 · 数据总览
+
+![管理后台数据总览](screenshots/admin-dashboard.png)
+
+### 管理后台 · 知识库管理
+
+![管理后台知识库管理](screenshots/admin-knowledge.png)
+
+### 管理后台 · 游客报告
+
+![管理后台游客报告](screenshots/admin-reports.png)
+
 ## 快速启动
 
 ### 1. 环境要求
@@ -24,8 +46,8 @@ pip install -r requirements.txt
 cp .env.example .env
 # 编辑 .env 填入你的 API Key
 
-# 启动后端 (http://localhost:8000)
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+# 启动后端 (http://localhost:8001)
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 ### 3. 前端
@@ -45,9 +67,9 @@ npm run dev
 | 页面 | 地址 |
 |:--|:--|
 | 游客端 | http://localhost:5173/ |
-| 管理后台 | http://localhost:5173/admin |
+| 管理后台 | http://localhost:5173/admin.html |
 | 动作测试 | http://localhost:5173/motions |
-| API 文档 | http://localhost:8000/docs |
+| API 文档 | http://localhost:8001/docs |
 
 ## 项目结构
 
@@ -68,7 +90,7 @@ npm run dev
 │   │   └── contexts/        # AuthContext
 │   └── public/live2d/Haru/  # Live2D 模型资源
 ├── knowledge_base/          # 景区知识文档
-├── tests/                   # 准确率评测脚本
+├── screenshots/             # 功能截图（README 展示）
 └── data/                    # 向量数据库 + SQLite (运行时生成)
 ```
 
