@@ -4,25 +4,25 @@
 
 ## 功能展示
 
-### 游客端 · 数字人对话
+### 对话展示
 
-![游客端聊天主页](screenshots/chat-home.png)
+![对话展示](screenshots/对话展示.png)
 
-### 游客端 · 景区地图（路线绘制 + 对话小窗）
+### 路线推荐
 
-![景区地图](screenshots/map-page.png)
+![路线推荐](screenshots/路线推荐.png)
 
-### 管理后台 · 数据总览
+### 路线展示
 
-![管理后台数据总览](screenshots/admin-dashboard.png)
+![路线展示](screenshots/路线展示.png)
 
-### 管理后台 · 知识库管理
+### 知识库管理
 
-![管理后台知识库管理](screenshots/admin-knowledge.png)
+![知识库管理](screenshots/知识库管理.png)
 
-### 管理后台 · 游客报告
+### 后台数据统计
 
-![管理后台游客报告](screenshots/admin-reports.png)
+![后台数据统计](screenshots/后台数据统计.png)
 
 ## 快速启动
 
